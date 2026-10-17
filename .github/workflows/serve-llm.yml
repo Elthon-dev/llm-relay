@@ -1,0 +1,146 @@
+name: serve-llm
+
+# Borrow a GitHub runner as a free CPU LLM box:
+#   schedule (every 6h) + manual dispatch. The job holds the model alive for
+#   ~5h50m, then the next cron run takes over. cloudflared publishes it.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Ollama model tag to serve"
+        required: false
+        default: "qwen2.5:7b"
+  schedule:
+    - cron: "0 */6 * * *"
+
+# Needed so the job can commit endpoint.txt back to the repo.
+permissions:
+  contents: write
+
+# Only one relay at a time; a fresh run replaces the stale one.
+concurrency:
+  group: serve-llm
+  cancel-in-progress: true
+
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355        # GitHub kills jobs at 360m; stay just under
+    env:
+      MODEL: ${{ github.event.inputs.model || 'qwen2.5:7b' }}
+      PORT: "8081"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h / | tail -1
+
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama --version
+
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared
+          ./cloudflared --version
+
+      - name: Start Ollama and pull the model
+        run: |
+          nohup ollama serve > ollama.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break
+            sleep 1
+          done
+          echo "Pulling $MODEL (this is the slow part)…"
+          ollama pull "$MODEL"
+          ollama list
+
+      - name: Start auth proxy
+        env:
+          RELAY_TOKEN: ${{ secrets.RELAY_TOKEN }}
+        run: |
+          if [ -z "$RELAY_TOKEN" ]; then
+            echo "::error::Repo secret RELAY_TOKEN is not set. Add it (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          nohup python3 proxy.py > proxy.log 2>&1 &
+          sleep 2
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/v1/models)
+          echo "proxy health http=$code (401 is expected — it means the gate is up)"
+
+      - name: Open cloudflared quick tunnel
+        id: tunnel
+        run: |
+          nohup ./cloudflared tunnel --url http://127.0.0.1:$PORT --no-autoupdate > cf.log 2>&1 &
+          URL=""
+          for i in $(seq 1 60); do
+            URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' cf.log | head -1)
+            [ -n "$URL" ] && break
+            sleep 2
+          done
+          if [ -z "$URL" ]; then
+            echo "::error::cloudflared never produced a URL"; cat cf.log; exit 1
+          fi
+          echo "endpoint=$URL/v1/chat/completions" >> "$GITHUB_OUTPUT"
+          {
+            echo "## 🧠 llm-relay is LIVE"
+            echo ""
+            echo "- **Endpoint:** \`$URL/v1/chat/completions\`"
+            echo "- **Model:** \`$MODEL\`"
+            echo "- **API key:** your \`RELAY_TOKEN\` secret"
+            echo ""
+            echo "Paste the endpoint + key into Bruh-Bot → 🔑 Settings."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish endpoint.txt
+        run: |
+          printf '%s\n' '${{ steps.tunnel.outputs.endpoint }}' > endpoint.txt
+          echo '${{ steps.tunnel.outputs.endpoint }}'
+          git config user.name "llm-relay-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add endpoint.txt
+          git commit -m "endpoint: ${{ github.run_id }} [skip ci]" || true
+          git push || true
+
+      - name: Smoke test the live endpoint
+        env:
+          RELAY_TOKEN: ${{ secrets.RELAY_TOKEN }}
+        run: |
+          sleep 5
+          curl -s -m 120 "${{ steps.tunnel.outputs.endpoint }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $RELAY_TOKEN" \
+            -d '{"model":"'"$MODEL"'","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":16}'
+          echo ""
+
+      - name: Keep alive + health monitor
+        run: |
+          END=$((SECONDS + 20400))   # ~340 min, leaves headroom under the 355m cap
+          while [ $SECONDS -lt $END ]; do
+            sleep 60
+            if ! pgrep -f "ollama serve" >/dev/null; then
+              echo "ollama died → restarting"
+              nohup ollama serve > ollama.log 2>&1 &
+              sleep 5
+            fi
+            if ! pgrep -f "cloudflared tunnel" >/dev/null; then
+              echo "tunnel died → restarting (URL will change)"
+              nohup ./cloudflared tunnel --url http://127.0.0.1:$PORT --no-autoupdate > cf.log 2>&1 &
+              sleep 10
+              NEW=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' cf.log | head -1)
+              if [ -n "$NEW" ]; then
+                printf '%s\n' "$NEW/v1/chat/completions" > endpoint.txt
+                git add endpoint.txt
+                git commit -m "endpoint update [skip ci]" || true
+                git push || true
+                echo "new endpoint: $NEW/v1/chat/completions"
+              fi
+            fi
+          done
+          echo "Time budget reached — letting the next cron run take over."
