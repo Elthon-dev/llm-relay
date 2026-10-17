@@ -29,13 +29,18 @@ jobs:
     env:
       MODEL: ${{ github.event.inputs.model || 'qwen2.5:7b' }}
       PORT: "8081"
-      # The agent prompt (system + 34 tool schemas + a big page snapshot) is way
-      # bigger than Ollama's 4096 default — without this the model truncates its
-      # own instructions and turns into a toddler.
+      # The agent prompt (system + tool schemas + a page snapshot) is bigger than
+      # Ollama's 4096 default — without this the model truncates its own
+      # instructions and turns into a toddler. Keep generous headroom.
       OLLAMA_CONTEXT_LENGTH: "16384"
       OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_FLASH_ATTENTION: "1"
       OLLAMA_KV_CACHE_TYPE: "q8_0"
+      # Keep the model resident so Ollama reuses the KV/prompt cache of the stable
+      # system+tools prefix across agent turns (huge prefill savings) instead of
+      # reloading it (cold start) every time the 5-min default expires.
+      OLLAMA_KEEP_ALIVE: "-1"
     steps:
       - uses: actions/checkout@v4
 
