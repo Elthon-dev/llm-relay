@@ -23,20 +23,42 @@ PORT = int(os.environ.get("PORT", "8081"))
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def _unauthorized(self):
-        body = b'{"error":{"message":"unauthorized: bad or missing RELAY_TOKEN"}}'
-        self.send_response(401)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
+    def _read_body(self):
+        # Consume the body on EVERY request — even a rejected one. Leaving bytes
+        # in the socket makes them get parsed as the next request line, which is
+        # how you get nonsense like 'Unsupported method (...)POST'.
+        te = (self.headers.get("Transfer-Encoding") or "").lower()
+        if "chunked" in te:
+            chunks = []
+            while True:
+                line = self.rfile.readline().strip()
+                try:
+                    n = int(line.split(b";")[0], 16)
+                except ValueError:
+                    break
+                if n == 0:
+                    self.rfile.readline()
+                    break
+                chunks.append(self.rfile.read(n))
+                self.rfile.read(2)  # trailing CRLF
+            return b"".join(chunks)
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        return self.rfile.read(length) if length else None
+
+    def _send(self, status, payload, ctype="application/json"):
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Connection", "close")
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(payload)
+        self.close_connection = True
 
     def _relay(self, method):
-        if TOKEN and self.headers.get("Authorization", "") != "Bearer " + TOKEN:
-            return self._unauthorized()
+        data = self._read_body()  # always drain first
 
-        length = int(self.headers.get("Content-Length", 0) or 0)
-        data = self.rfile.read(length) if length else None
+        if TOKEN and self.headers.get("Authorization", "") != "Bearer " + TOKEN:
+            return self._send(401, b'{"error":{"message":"unauthorized: bad or missing RELAY_TOKEN"}}')
 
         req = urllib.request.Request(UPSTREAM + self.path, data=data, method=method)
         req.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
@@ -44,23 +66,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         try:
             with urllib.request.urlopen(req, timeout=900) as resp:
-                payload = resp.read()
-                status = resp.status
+                payload, status = resp.read(), resp.status
                 ctype = resp.headers.get("Content-Type", "application/json")
         except urllib.error.HTTPError as e:
-            payload = e.read()
-            status = e.code
-            ctype = "application/json"
+            payload, status, ctype = e.read(), e.code, "application/json"
         except Exception as e:  # upstream down, timeout, etc.
-            payload = json.dumps({"error": {"message": str(e)}}).encode()
-            status = 502
-            ctype = "application/json"
+            payload, status, ctype = json.dumps({"error": {"message": str(e)}}).encode(), 502, "application/json"
 
-        self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+        self._send(status, payload, ctype)
 
     def do_GET(self):
         self._relay("GET")
