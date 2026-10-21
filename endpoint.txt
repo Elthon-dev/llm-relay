@@ -1,1 +1,1 @@
-https://heated-gzip-preservation-james.trycloudflare.com/v1/chat/completions
+https://smtp-renew-task-fill.trycloudflare.com/v1/chat/completions
