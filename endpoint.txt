@@ -1,1 +1,1 @@
-https://never-ruth-rna-trigger.trycloudflare.com/v1/chat/completions
+https://heated-gzip-preservation-james.trycloudflare.com/v1/chat/completions
