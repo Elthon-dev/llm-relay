@@ -1,1 +1,1 @@
-https://logo-citizen-marie-grad.trycloudflare.com/v1/chat/completions
+https://pools-vocal-lucy-tiles.trycloudflare.com/v1/chat/completions
