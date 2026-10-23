@@ -1,1 +1,1 @@
-https://moments-urge-mile-bull.trycloudflare.com/v1/chat/completions
+https://tel-bbs-leaving-hierarchy.trycloudflare.com/v1/chat/completions
