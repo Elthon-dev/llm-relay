@@ -1,1 +1,1 @@
-https://amp-brush-brush-eds.trycloudflare.com/v1/chat/completions
+https://kelly-convertible-grew-sign.trycloudflare.com/v1/chat/completions
