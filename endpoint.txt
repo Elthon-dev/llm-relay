@@ -1,1 +1,1 @@
-https://commodity-dat-chemistry-hello.trycloudflare.com/v1/chat/completions
+https://silent-acquisitions-sheffield-intermediate.trycloudflare.com/v1/chat/completions
