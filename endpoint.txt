@@ -1,1 +1,1 @@
-https://skiing-catch-quarters-legends.trycloudflare.com/v1/chat/completions
+https://pdt-developer-analyze-speech.trycloudflare.com/v1/chat/completions
