@@ -1,1 +1,1 @@
-https://mere-someone-college-const.trycloudflare.com/v1/chat/completions
+https://instance-springs-specialties-arrangement.trycloudflare.com/v1/chat/completions
