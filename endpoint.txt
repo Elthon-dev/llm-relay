@@ -1,1 +1,1 @@
-https://rendered-rolls-workforce-welding.trycloudflare.com/v1/chat/completions
+https://illinois-amplifier-peers-pope.trycloudflare.com/v1/chat/completions
