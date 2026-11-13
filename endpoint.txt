@@ -1,1 +1,1 @@
-https://hub-logic-terrorist-chain.trycloudflare.com/v1/chat/completions
+https://margaret-warning-determining-sentences.trycloudflare.com/v1/chat/completions
