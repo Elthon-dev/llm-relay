@@ -1,1 +1,1 @@
-https://traffic-creations-seven-martha.trycloudflare.com/v1/chat/completions
+https://mon-vcr-union-architects.trycloudflare.com/v1/chat/completions
