@@ -1,1 +1,1 @@
-https://heated-gathering-furnishings-issued.trycloudflare.com/v1/chat/completions
+https://lawrence-retired-klein-many.trycloudflare.com/v1/chat/completions
