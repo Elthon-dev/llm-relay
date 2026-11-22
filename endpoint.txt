@@ -1,1 +1,1 @@
-https://pop-tool-frank-place.trycloudflare.com/v1/chat/completions
+https://diet-finds-upgrade-edgar.trycloudflare.com/v1/chat/completions
