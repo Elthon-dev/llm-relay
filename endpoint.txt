@@ -1,1 +1,1 @@
-https://stops-freight-pst-fire.trycloudflare.com/v1/chat/completions
+https://league-boards-therapeutic-colleagues.trycloudflare.com/v1/chat/completions
