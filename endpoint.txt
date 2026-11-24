@@ -1,1 +1,1 @@
-https://each-preservation-head-roger.trycloudflare.com/v1/chat/completions
+https://gale-has-tired-zealand.trycloudflare.com/v1/chat/completions
