@@ -1,1 +1,1 @@
-https://catalog-shopzilla-lecture-nancy.trycloudflare.com/v1/chat/completions
+https://namespace-asp-fast-subaru.trycloudflare.com/v1/chat/completions
