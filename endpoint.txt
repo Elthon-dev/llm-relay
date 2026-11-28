@@ -1,1 +1,1 @@
-https://motivation-away-brick-cia.trycloudflare.com/v1/chat/completions
+https://sims-chambers-munich-democrat.trycloudflare.com/v1/chat/completions
